@@ -6,7 +6,7 @@ A simple Python project that demonstrates:
 
 
 
-MongoDB database connectivity using pymongo
+MongoDB database connectivity using pymongo.
 
 Inserting sample threat intelligence data
 
@@ -17,7 +17,6 @@ Basic web scraping setup with BeautifulSoup
 
 
 This project is useful for beginners learning:
-
 
 
 Cybersecurity scripting
