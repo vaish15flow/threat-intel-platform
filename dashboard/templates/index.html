@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatPulse — Threat Intelligence Platform</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & Variables ─────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #f0f2fb;
+    --sidebar:    linear-gradient(175deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%);
+    --card:       #ffffff;
+    --primary:    #4f46e5;
+    --primary-lt: #eef2ff;
+    --danger:     #ef4444;
+    --warning:    #f59e0b;
+    --success:    #10b981;
+    --info:       #06b6d4;
+    --text:       #1e293b;
+    --muted:      #64748b;
+    --border:     #e2e8f0;
+    --shadow:     0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(79,70,229,.06);
+    --shadow-lg:  0 8px 32px rgba(79,70,229,.12);
+    --radius:     14px;
+    --sidebar-w:  260px;
+  }
+
+  html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+
+  /* ── Layout ────────────────────────────────────────────────── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ───────────────────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--sidebar);
+    display: flex; flex-direction: column;
+    padding: 28px 0;
+    position: fixed; top: 0; left: 0; height: 100vh;
+    z-index: 100;
+  }
+  .sidebar-logo {
+    padding: 0 24px 32px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #a5b4fc, #818cf8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: #fff; }
+  .logo-sub  { font-size: 11px; color: #a5b4fc; letter-spacing: .5px; }
+
+  .nav-section { padding: 0 14px 8px; }
+  .nav-label   { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: #6366f1; padding: 12px 10px 6px; }
+  .nav-item    {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    color: #c7d2fe; font-size: 14px; font-weight: 500;
+    transition: all .2s; margin-bottom: 2px;
+  }
+  .nav-item:hover, .nav-item.active {
+    background: rgba(165,180,252,.15); color: #fff;
+  }
+  .nav-item.active { background: rgba(165,180,252,.22); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .sidebar-footer {
+    margin-top: auto; padding: 16px 24px;
+    border-top: 1px solid rgba(165,180,252,.15);
+  }
+  .live-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #a5b4fc;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16,185,129,.6);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+    100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  }
+
+  /* ── Main Content ──────────────────────────────────────────── */
+  .main { margin-left: var(--sidebar-w); flex: 1; padding: 0; }
+
+  /* ── Top Bar ───────────────────────────────────────────────── */
+  .topbar {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 16px 32px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 50;
+  }
+  .page-title { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; }
+  .topbar-actions { display: flex; align-items: center; gap: 12px; }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; transition: all .2s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: #4338ca; transform: translateY(-1px); }
+  .btn-ghost  { background: var(--primary-lt); color: var(--primary); }
+  .btn-ghost:hover { background: #e0e7ff; }
+  .refresh-time { font-size: 12px; color: var(--muted); }
+
+  /* ── Page Content ──────────────────────────────────────────── */
+  .content { padding: 28px 32px; }
+
+  /* ── Stat Cards ────────────────────────────────────────────── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--card); border-radius: var(--radius); padding: 22px;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+    border-top: 4px solid transparent; transition: transform .2s, box-shadow .2s;
+  }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .stat-card.total   { border-top-color: var(--primary); }
+  .stat-card.high    { border-top-color: var(--danger);  }
+  .stat-card.medium  { border-top-color: var(--warning); }
+  .stat-card.blocked { border-top-color: #8b5cf6;        }
+  .stat-card.rules   { border-top-color: var(--success); }
+  .stat-label  { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 8px; }
+  .stat-value  { font-family: 'Space Grotesk', sans-serif; font-size: 36px; font-weight: 700; line-height: 1; }
+  .stat-icon   { position: absolute; right: 18px; top: 18px; font-size: 28px; opacity: .12; }
+  .stat-card.total   .stat-value { color: var(--primary); }
+  .stat-card.high    .stat-value { color: var(--danger); }
+  .stat-card.medium  .stat-value { color: var(--warning); }
+  .stat-card.blocked .stat-value { color: #8b5cf6; }
+  .stat-card.rules   .stat-value { color: var(--success); }
+
+  /* ── Charts Row ────────────────────────────────────────────── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  .chart-card {
+    background: var(--card); border-radius: var(--radius); padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .chart-title {
+    font-size: 14px; font-weight: 600; margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chart-title-dot { width: 8px; height: 8px; border-radius: 50%; }
+  canvas { max-height: 220px; }
+
+  /* ── Threat Feed Table ─────────────────────────────────────── */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; }
+  .table-card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #f8faff; }
+  th {
+    padding: 12px 16px; text-align: left; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
+    border-bottom: 1px solid var(--border); font-weight: 600;
+  }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafbff; }
+
+  .badge {
+    display: inline-flex; align-items: center; padding: 3px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .3px;
+  }
+  .badge-high   { background: #fef2f2; color: #dc2626; }
+  .badge-medium { background: #fffbeb; color: #d97706; }
+  .badge-low    { background: #f0fdf4; color: #16a34a; }
+  .badge-blocked{ background: #f5f3ff; color: #7c3aed; }
+  .badge-active { background: #ecfdf5; color: #065f46; }
+
+  .tag { display: inline-block; background: #f1f5f9; color: var(--muted); padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 1px; }
+
+  .source-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500; background: var(--primary-lt); color: var(--primary);
+  }
+
+  .rollback-btn {
+    padding: 4px 10px; font-size: 11px; font-weight: 600;
+    border: 1px solid #e2e8f0; border-radius: 6px;
+    background: #fff; cursor: pointer; color: var(--muted);
+    transition: all .2s;
+  }
+  .rollback-btn:hover { background: #fef2f2; color: var(--danger); border-color: #fca5a5; }
+
+  /* ── Blocked IPs Panel ─────────────────────────────────────── */
+  .blocked-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .blocked-card {
+    background: var(--card); border-radius: 10px; padding: 16px;
+    box-shadow: var(--shadow); border-left: 4px solid #8b5cf6;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .blocked-ip   { font-family: monospace; font-size: 14px; font-weight: 600; color: var(--text); }
+  .blocked-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Toast ─────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #1e293b; color: #fff; padding: 12px 20px;
+    border-radius: 10px; font-size: 13px; font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 999;
+    opacity: 0; transform: translateY(10px); transition: all .3s;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Scrollbar ─────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 3px; }
+
+  /* ── Section Tabs ──────────────────────────────────────────── */
+  .tab-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab {
+    padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--muted);
+    transition: all .2s;
+  }
+  .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  .section-panel { display: none; }
+  .section-panel.active { display: block; }
+
+  /* ── Empty State ───────────────────────────────────────────── */
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: .4; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🛡️</div>
+      <div>
+        <div class="logo-text">ThreatPulse</div>
+        <div class="logo-sub">INTELLIGENCE PLATFORM</div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Monitor</div>
+      <div class="nav-item active" onclick="switchTab('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="switchTab('threats')">
+        <span class="nav-icon">⚠️</span> Threat Feed
+      </div>
+      <div class="nav-item" onclick="switchTab('blocked')">
+        <span class="nav-icon">🚫</span> Blocked IPs
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Operations</div>
+      <div class="nav-item" onclick="switchTab('rollback')">
+        <span class="nav-icon">↩️</span> Rollback Manager
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span>Live monitoring active</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────────────── -->
+  <div class="main">
+
+    <div class="topbar">
+      <div class="page-title" id="pageTitle">Security Dashboard</div>
+      <div class="topbar-actions">
+        <span class="refresh-time" id="lastRefresh">Refreshing...</span>
+        <button class="btn btn-ghost" onclick="loadAll()">↻ Refresh</button>
+        <button class="btn btn-primary" onclick="showBlockModal()">+ Block IP</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── Stat Cards ──────────────────────────────────────── -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card total"><div class="stat-label">Total Indicators</div><div class="stat-value" id="s-total">—</div><div class="stat-icon">🌐</div></div>
+        <div class="stat-card high"><div class="stat-label">High Risk</div><div class="stat-value" id="s-high">—</div><div class="stat-icon">🔴</div></div>
+        <div class="stat-card medium"><div class="stat-label">Medium Risk</div><div class="stat-value" id="s-medium">—</div><div class="stat-icon">🟡</div></div>
+        <div class="stat-card blocked"><div class="stat-label">Blocked</div><div class="stat-value" id="s-blocked">—</div><div class="stat-icon">🚫</div></div>
+        <div class="stat-card rules"><div class="stat-label">Active Rules</div><div class="stat-value" id="s-rules">—</div><div class="stat-icon">⚙️</div></div>
+      </div>
+
+      <!-- ── Section Tabs ────────────────────────────────────── -->
+      <div class="tab-row">
+        <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">📊 Overview</div>
+        <div class="tab" id="tab-threats" onclick="switchTab('threats')">⚠️ Threat Feed</div>
+        <div class="tab" id="tab-blocked" onclick="switchTab('blocked')">🚫 Blocked IPs</div>
+        <div class="tab" id="tab-rollback" onclick="switchTab('rollback')">↩️ Rollback</div>
+      </div>
+
+      <!-- ── Dashboard Panel ─────────────────────────────────── -->
+      <div class="section-panel active" id="panel-dashboard">
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-title"><div class="chart-title-dot" style="background:#4f46e5"></div>Threat Types</div>
+            <canvas id="chartTypes"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title"><div class="chart-title-dot" style="background:#ef4444"></div>Severity Distribution</div>
+            <canvas id="chartSeverity"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title"><div class="chart-title-dot" style="background:#06b6d4"></div>Risk Score Buckets</div>
+            <canvas id="chartBuckets"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Threat Feed Panel ───────────────────────────────── -->
+      <div class="section-panel" id="panel-threats">
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Indicator</th>
+                <th>Threat Type</th>
+                <th>Source</th>
+                <th>Risk Score</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Tags</th>
+              </tr>
+            </thead>
+            <tbody id="threatBody">
+              <tr><td colspan="7" class="empty"><div class="empty-icon">⏳</div>Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Blocked IPs Panel ───────────────────────────────── -->
+      <div class="section-panel" id="panel-blocked">
+        <div id="blockedGrid" class="blocked-grid">
+          <div class="empty"><div class="empty-icon">🔒</div><p>No blocked IPs yet.</p></div>
+        </div>
+      </div>
+
+      <!-- ── Rollback Panel ──────────────────────────────────── -->
+      <div class="section-panel" id="panel-rollback">
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Blocked IP</th>
+                <th>Threat Type</th>
+                <th>Risk Score</th>
+                <th>Blocked At</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rollbackBody">
+              <tr><td colspan="5" class="empty"><div class="empty-icon">✅</div>No active auto-blocks.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ── Toast ─────────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Globals ──────────────────────────────────────────────────────────────────
+let chartTypes, chartSev, chartBuckets;
+const SEVERITY_COLORS = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#10b981' };
+
+// ── Tab Switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('tab-'   + name).classList.add('active');
+  const titles = { dashboard:'Security Dashboard', threats:'Threat Feed', blocked:'Blocked IPs', rollback:'Rollback Manager' };
+  document.getElementById('pageTitle').textContent = titles[name] || 'Dashboard';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (name === 'threats')  loadThreats();
+  if (name === 'blocked')  loadBlocked();
+  if (name === 'rollback') loadRollback();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, duration=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const r = await fetch('/api/stats').then(r => r.json());
+  document.getElementById('s-total').textContent  = r.total.toLocaleString();
+  document.getElementById('s-high').textContent   = r.high_risk.toLocaleString();
+  document.getElementById('s-medium').textContent = r.medium_risk.toLocaleString();
+  document.getElementById('s-blocked').textContent= r.blocked.toLocaleString();
+  document.getElementById('s-rules').textContent  = r.active_rules.toLocaleString();
+  document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+async function loadCharts() {
+  const d = await fetch('/api/charts').then(r => r.json());
+
+  // Threat Types — donut
+  const typeCtx = document.getElementById('chartTypes').getContext('2d');
+  if (chartTypes) chartTypes.destroy();
+  chartTypes = new Chart(typeCtx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(d.threat_types),
+      datasets: [{ data: Object.values(d.threat_types),
+        backgroundColor: ['#4f46e5','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6'],
+        borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 }}}, cutout: '65%' }
+  });
+
+  // Severity — bar
+  const sevCtx = document.getElementById('chartSeverity').getContext('2d');
+  if (chartSev) chartSev.destroy();
+  chartSev = new Chart(sevCtx, {
+    type: 'bar',
+    data: {
+      labels: ['HIGH', 'MEDIUM', 'LOW'],
+      datasets: [{ data: [d.severity.HIGH, d.severity.MEDIUM, d.severity.LOW],
+        backgroundColor: ['#fef2f2','#fffbeb','#f0fdf4'],
+        borderColor: ['#ef4444','#f59e0b','#10b981'],
+        borderWidth: 2, borderRadius: 6 }]
+    },
+    options: { plugins: { legend: { display: false }}, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }}}}
+  });
+
+  // Risk Buckets — bar
+  const bktCtx = document.getElementById('chartBuckets').getContext('2d');
+  if (chartBuckets) chartBuckets.destroy();
+  chartBuckets = new Chart(bktCtx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(d.risk_buckets),
+      datasets: [{ data: Object.values(d.risk_buckets),
+        backgroundColor: ['#e0e7ff','#bfdbfe','#fef3c7','#fee2e2','#fce7f3'],
+        borderColor: ['#6366f1','#3b82f6','#f59e0b','#ef4444','#ec4899'],
+        borderWidth: 2, borderRadius: 6 }]
+    },
+    options: { plugins: { legend: { display: false }}, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }}}}
+  });
+}
+
+// ── Threats Table ─────────────────────────────────────────────────────────────
+async function loadThreats() {
+  const data = await fetch('/api/threats?limit=60').then(r => r.json());
+  const body = document.getElementById('threatBody');
+  if (!data.length) { body.innerHTML = '<tr><td colspan="7" class="empty"><div class="empty-icon">✅</div>No threats found.</td></tr>'; return; }
+
+  body.innerHTML = data.map(t => {
+    const sev   = (t.severity || 'LOW').toUpperCase();
+    const ind   = t.ip_address || t.domain || t.url || '—';
+    const short = ind.length > 28 ? ind.substring(0,26)+'…' : ind;
+    const tags  = (t.tags || []).slice(0,3).map(g => `<span class="tag">${g}</span>`).join('');
+    const score = (t.risk_score || 0).toFixed(1);
+    const status = t.is_blocked ? '<span class="badge badge-blocked">blocked</span>' : '<span class="badge badge-active">active</span>';
+    return `<tr>
+      <td><code style="font-size:12px;color:#1e293b">${short}</code></td>
+      <td>${t.threat_type || '—'}</td>
+      <td><span class="source-chip">${t.source || '—'}</span></td>
+      <td><strong style="color:${score>=7?'#ef4444':score>=4?'#f59e0b':'#10b981'}">${score}</strong></td>
+      <td><span class="badge badge-${sev.toLowerCase()}">${sev}</span></td>
+      <td>${status}</td>
+      <td>${tags || '<span class="tag">none</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Blocked IPs ───────────────────────────────────────────────────────────────
+async function loadBlocked() {
+  const data = await fetch('/api/blocked').then(r => r.json());
+  const grid = document.getElementById('blockedGrid');
+  if (!data.length) { grid.innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><p>No blocked IPs yet.</p></div>'; return; }
+
+  grid.innerHTML = data.map(e => `
+    <div class="blocked-card">
+      <div>
+        <div class="blocked-ip">${e.ip}</div>
+        <div class="blocked-meta">${e.threat_type} · Score: ${e.risk_score}</div>
+        <div class="blocked-meta">${e.blocked_at}</div>
+      </div>
+      <button class="rollback-btn" onclick="doRollback('${e.ip}')">Rollback</button>
+    </div>`).join('');
+}
+
+// ── Rollback Table ────────────────────────────────────────────────────────────
+async function loadRollback() {
+  const data = await fetch('/api/blocked').then(r => r.json());
+  const body = document.getElementById('rollbackBody');
+  if (!data.length) { body.innerHTML = '<tr><td colspan="5" class="empty"><div class="empty-icon">✅</div>No active auto-blocks.</td></tr>'; return; }
+
+  body.innerHTML = data.map(e => `<tr>
+    <td><code>${e.ip}</code></td>
+    <td>${e.threat_type}</td>
+    <td><strong style="color:#ef4444">${e.risk_score}</strong></td>
+    <td style="color:var(--muted);font-size:12px">${e.blocked_at}</td>
+    <td><button class="rollback-btn" onclick="doRollback('${e.ip}')">↩ Rollback</button></td>
+  </tr>`).join('');
+}
+
+// ── Block IP ──────────────────────────────────────────────────────────────────
+function showBlockModal() {
+  const ip = prompt('Enter IP address to block manually:');
+  if (!ip) return;
+  fetch('/api/block', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ip}) })
+    .then(r => r.json()).then(d => { showToast(d.message || 'Blocked!'); loadAll(); });
+}
+
+// ── Rollback ──────────────────────────────────────────────────────────────────
+async function doRollback(ip) {
+  if (!confirm(`Remove block on ${ip}?`)) return;
+  const d = await fetch('/api/rollback', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ip}) }).then(r=>r.json());
+  showToast('↩ ' + (d.message || 'Rolled back'));
+  loadAll(); loadBlocked(); loadRollback();
+}
+
+// ── Load All ──────────────────────────────────────────────────────────────────
+function loadAll() {
+  loadStats();
+  loadCharts();
+}
+
+// ── Auto-refresh every 15s ────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 15000);
+</script>
+
+</body>
+</html>
